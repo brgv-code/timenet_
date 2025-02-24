@@ -54,10 +54,9 @@
 
             %% Test Apache Server Handling
             subgraph "Test Apache Server Configuration"
-                TestApacheStage --> GenerateTestURL["Generate Test URL Based on Commit Hash"]
-                GenerateTestURL --> MatchTestHash["Match Commit Hash in Test Apache"]
-                MatchTestHash --> ReplaceTestFiles["Replace 'htdocs' Directory in Test Server"]
-                ReplaceTestFiles --> TestCompletion["Test Deployment Successful"]
+                TestApacheStage --> GenerateTestURL["User enters Test URL with Commit Hash in queryParams"]
+                GenerateTestURL --> MatchTestHash["Match Commit Hash htdocs folder in Test Apache "]
+                MatchTestHash --> TestCompletion["Test the specific commit in Test Server"]
             end
 
             %% Manual Trigger for Production
@@ -66,18 +65,13 @@
             %% Production Deployment Process
             subgraph "Production Deployment Process"
                 StartProd --> PrepareProdHtdocs["Prepare 'htdocs' for Production"]
-                PrepareProdHtdocs --> NameProdFolder["Name Production Folder Using Commit Hash"]
-                NameProdFolder --> TransferProdFiles["Transfer Production Files to Windows Server"]
-                TransferProdFiles --> ProdApacheStage["Proceed to Production Apache Server Handling"]
-            end
-
-            %% Production Apache Server Handling
-            subgraph "Production Apache Server Configuration"
-                ProdApacheStage --> GenerateProdURL["Generate Production URL Based on Commit Hash"]
-                GenerateProdURL --> MatchProdHash["Match Commit Hash in Apache"]
-                MatchProdHash --> ReplaceProdFiles["Replace 'htdocs' Directory in Production Server"]
+                PrepareProdHtdocs --> ProdApacheStage["Proceed to Production deployment"]
+                ProdApacheStage --> ReplaceProdFiles["Replace 'htdocs' Directory in Production Server"]
                 ReplaceProdFiles --> ProdCompletion["Production Deployment Successful"]
             end
+
+            %% End of the Pipeline
+            ProdCompletion -->|End| End["End GitLab Pipeline"]
     </div>
 </body>
 </html>
