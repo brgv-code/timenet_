@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Diagram</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.esm.min.mjs';
+        
+        mermaid.initialize({
+            themeVariables: {
+                primaryColor: '#3498db',
+                secondaryColor: '#95a5a6',
+                edgeLabelBackground: '#f39c12',
+                lineColor: '#34495e',
+                primaryTextColor: '#ffffff',
+                secondaryTextColor: '#ecf0f1',
+                tertiaryColor: '#e74c3c'
+            }
+        });
+    </script>
+</head>
+<body>
+    <div class="mermaid">
+        graph TD
+            %% Start of the Pipeline
+            Start["Start GitLab Pipeline"] -->|1️⃣ Linting Stage| LintStage
+
+            %% Linting Stage
+            subgraph "Linting & Testing"
+                LintStage["Run Linting"] --> LintCheck["Check for Code Quality & Syntax Errors"]
+                LintCheck -->|Pass| RunTests["Run Unit & Integration Tests"]
+                LintCheck -->|Fail| FixLint["Fix Linting Issues"] --> LintCheck
+
+                RunTests -->|Pass| NextStage["Proceed to Build & Execution"]
+                RunTests -->|Fail| FixTests["Fix Failing Tests"] --> RunTests
+            end
+
+            %% Build & Execution Stage
+            subgraph "Build & Pipeline Execution"
+                NextStage --> Build["Execute GitLab Pipeline"]
+                Build --> BuildCheck["Verify Build & Test Results"]
+                BuildCheck -->|Pass| DeployTestStage["Deploy to Test Environment"]
+                BuildCheck -->|Fail| FixBuild["Debug & Fix Build Issues"] --> Build
+            end
+
+            %% Test Deployment
+            subgraph "Test Deployment Process"
+                DeployTestStage --> PrepareTestHtdocs["Prepare 'htdocs' for Test Deployment"]
+                PrepareTestHtdocs --> NameTestFolder["Name Test Deployment Folder Using Commit Hash"]
+                NameTestFolder --> TransferTestFiles["Transfer Test Files to Windows Server"]
+                TransferTestFiles --> TestApacheStage["Proceed to Test Apache Server Handling"]
+            end
+
+            %% Test Apache Server Handling
+            subgraph "Test Apache Server Configuration"
+                TestApacheStage --> GenerateTestURL["Generate Test URL Based on Commit Hash"]
+                GenerateTestURL --> MatchTestHash["Match Commit Hash in Test Apache"]
+                MatchTestHash --> ReplaceTestFiles["Replace 'htdocs' Directory in Test Server"]
+                ReplaceTestFiles --> TestCompletion["Test Deployment Successful"]
+            end
+
+            %% Manual Trigger for Production
+            TestCompletion -->|Manual Trigger| StartProd["Start Production Pipeline"]
+
+            %% Production Deployment Process
+            subgraph "Production Deployment Process"
+                StartProd --> PrepareProdHtdocs["Prepare 'htdocs' for Production"]
+                PrepareProdHtdocs --> NameProdFolder["Name Production Folder Using Commit Hash"]
+                NameProdFolder --> TransferProdFiles["Transfer Production Files to Windows Server"]
+                TransferProdFiles --> ProdApacheStage["Proceed to Production Apache Server Handling"]
+            end
+
+            %% Production Apache Server Handling
+            subgraph "Production Apache Server Configuration"
+                ProdApacheStage --> GenerateProdURL["Generate Production URL Based on Commit Hash"]
+                GenerateProdURL --> MatchProdHash["Match Commit Hash in Apache"]
+                MatchProdHash --> ReplaceProdFiles["Replace 'htdocs' Directory in Production Server"]
+                ReplaceProdFiles --> ProdCompletion["Production Deployment Successful"]
+            end
+    </div>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitLab Pipeline Trigger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+        background: #f6f6f6;
+      }
+
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .demo-mode {
+        background: #fff3cd;
+        border: 1px solid #ffeeba;
+        color: #856404;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #374151;
+      }
+
+      select,
+      button {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+
+      select {
+        background-color: white;
+        margin-bottom: 16px;
+      }
+
+      button {
+        background-color: #1f2937;
+        color: white;
+        border: none;
+        padding: 10px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      button:hover {
+        background-color: #374151;
+      }
+
+      button:disabled {
+        background-color: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      .commits-container {
+        margin-top: 16px;
+      }
+
+      .commit-item {
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .commit-item:hover {
+        border-color: #93c5fd;
+        background-color: #f8fafc;
+      }
+
+      .commit-item.selected {
+        border-color: #3b82f6;
+        background-color: #eff6ff;
+      }
+
+      .commit-sha {
+        font-family: monospace;
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      .commit-message {
+        margin: 4px 0;
+        font-size: 14px;
+      }
+
+      .commit-author {
+        color: #6b7280;
+        font-size: 12px;
+      }
+
+      #status {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        display: none;
+      }
+
+      .success {
+        background-color: #d1fae5;
+        color: #065f46;
+      }
+
+      .error {
+        background-color: #fee2e2;
+        color: #991b1b;
+      }
+
+      .loading {
+        opacity: 0.7;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Pipeline Trigger</h1>
+      <div id="demo-notice" style="display: none" class="demo-mode">
+        Running in demo mode with dummy data (no GitLab credentials provided)
+      </div>
+
+      <div class="form-group">
+        <label for="branch-select">Select Branch</label>
+        <select id="branch-select">
+          <option value="">Choose a branch</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label id="commits-label" style="display: none">Select Commit</label>
+        <div id="commits-container" class="commits-container"></div>
+      </div>
+
+      <button id="trigger-button" disabled>Trigger Pipeline</button>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      // Configuration
+      const GITLAB_API_URL = ""; // Your GitLab instance URL
+      const PROJECT_ID = ""; // Your project ID
+      const GITLAB_TOKEN = ""; // Your personal access token
+
+      // Dummy data for demo mode
+      const DUMMY_DATA = {
+        branches: [
+          { name: "main" },
+          { name: "develop" },
+          { name: "feature/user-auth" },
+          { name: "feature/api-integration" },
+          { name: "bugfix/login-issue" },
+        ],
+        commits: {
+          main: [
+            {
+              id: "abc1234",
+              short_id: "abc1234",
+              title: "Update deployment configuration",
+              author_name: "John Doe",
+              created_at: "2025-01-07T10:30:00Z",
+            },
+            {
+              id: "def5678",
+              short_id: "def5678",
+              title: "Fix production bug in user authentication",
+              author_name: "Jane Smith",
+              created_at: "2025-01-06T15:45:00Z",
+            },
+            {
+              id: "ghi9012",
+              short_id: "ghi9012",
+              title: "Merge: Add new feature XYZ",
+              author_name: "Mike Johnson",
+              created_at: "2025-01-05T09:20:00Z",
+            },
+          ],
+          develop: [
+            {
+              id: "jkl3456",
+              short_id: "jkl3456",
+              title: "Add new API endpoints",
+              author_name: "Sarah Wilson",
+              created_at: "2025-01-07T14:20:00Z",
+            },
+            {
+              id: "mno7890",
+              short_id: "mno7890",
+              title: "Update dependencies",
+              author_name: "Tom Brown",
+              created_at: "2025-01-06T11:30:00Z",
+            },
+          ],
+        },
+      };
+
+      // Elements
+      const branchSelect = document.getElementById("branch-select");
+      const commitsLabel = document.getElementById("commits-label");
+      const commitsContainer = document.getElementById("commits-container");
+      const triggerButton = document.getElementById("trigger-button");
+      const statusDiv = document.getElementById("status");
+      const demoNotice = document.getElementById("demo-notice");
+
+      let selectedCommit = null;
+      const isDemo = !GITLAB_API_URL || !PROJECT_ID || !GITLAB_TOKEN;
+
+      if (isDemo) {
+        demoNotice.style.display = "block";
+      }
+
+      // Configure axios defaults if not in demo mode
+      if (!isDemo) {
+        axios.defaults.headers.common["PRIVATE-TOKEN"] = GITLAB_TOKEN;
+      }
+
+      // Fetch branches
+      async function fetchBranches() {
+        if (isDemo) {
+          DUMMY_DATA.branches.forEach((branch) => {
+            const option = document.createElement("option");
+            option.value = branch.name;
+            option.textContent = branch.name;
+            branchSelect.appendChild(option);
+          });
+          return;
+        }
+
+        try {
+          const response = await axios.get(
+            `${GITLAB_API_URL}/projects/${PROJECT_ID}/repository/branches`
+          );
+
+          response.data.forEach((branch) => {
+            const option = document.createElement("option");
+            option.value = branch.name;
+            option.textContent = branch.name;
+            branchSelect.appendChild(option);
+          });
+        } catch (error) {
+          showStatus("Error fetching branches: " + error.message, "error");
+        }
+      }
+
+      // Fetch commits for selected branch
+      async function fetchCommits(branch) {
+        if (isDemo) {
+          const commits =
+            DUMMY_DATA.commits[branch] || DUMMY_DATA.commits["main"];
+          displayCommits(commits);
+          return;
+        }
+
+        try {
+          const response = await axios.get(
+            `${GITLAB_API_URL}/projects/${PROJECT_ID}/repository/commits`,
+            { params: { ref_name: branch } }
+          );
+          displayCommits(response.data);
+        } catch (error) {
+          showStatus("Error fetching commits: " + error.message, "error");
+        }
+      }
+
+      function displayCommits(commits) {
+        commitsLabel.style.display = "block";
+        commitsContainer.innerHTML = "";
+
+        commits.forEach((commit) => {
+          const commitElement = document.createElement("div");
+          commitElement.className = "commit-item";
+          commitElement.innerHTML = `
+                    <div class="commit-sha">${commit.short_id}</div>
+                    <div class="commit-message">${commit.title}</div>
+                    <div class="commit-author">${
+                      commit.author_name
+                    } • ${new Date(commit.created_at).toLocaleString()}</div>
+                `;
+
+          commitElement.addEventListener("click", () => {
+            document.querySelectorAll(".commit-item").forEach((item) => {
+              item.classList.remove("selected");
+            });
+            commitElement.classList.add("selected");
+            selectedCommit = commit;
+            triggerButton.disabled = false;
+          });
+
+          commitsContainer.appendChild(commitElement);
+        });
+      }
+
+      // Trigger pipeline
+      async function triggerPipeline() {
+        if (!selectedCommit) return;
+
+        document.body.classList.add("loading");
+        showStatus("Triggering pipeline...", "loading");
+
+        if (isDemo) {
+          // Simulate API delay
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          showStatus(
+            `Demo: Pipeline triggered successfully! Pipeline ID: DEMO-${Math.floor(
+              Math.random() * 1000
+            )}`,
+            "success"
+          );
+          document.body.classList.remove("loading");
+          return;
+        }
+
+        try {
+          const response = await axios.post(
+            `${GITLAB_API_URL}/projects/${PROJECT_ID}/pipeline`,
+            {
+              ref: branchSelect.value,
+              variables: [
+                {
+                  key: "COMMIT_SHA",
+                  value: selectedCommit.id,
+                },
+              ],
+            }
+          );
+
+          showStatus(
+            `Pipeline triggered successfully! Pipeline ID: ${response.data.id}`,
+            "success"
+          );
+        } catch (error) {
+          showStatus("Error triggering pipeline: " + error.message, "error");
+        } finally {
+          document.body.classList.remove("loading");
+        }
+      }
+
+      // Show status message
+      function showStatus(message, type) {
+        statusDiv.textContent = message;
+        statusDiv.className = type;
+        statusDiv.style.display = "block";
+      }
+
+      // Event listeners
+      branchSelect.addEventListener("change", (e) => {
+        if (e.target.value) {
+          fetchCommits(e.target.value);
+        } else {
+          commitsLabel.style.display = "none";
+          commitsContainer.innerHTML = "";
+          triggerButton.disabled = true;
+        }
+      });
+
+      triggerButton.addEventListener("click", triggerPipeline);
+
+      // Initialize
+      fetchBranches();
+    </script>
+  </body>
+</html>
